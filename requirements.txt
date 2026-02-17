@@ -1,0 +1,28 @@
+# ===== UI =====
+ttkbootstrap==1.10.1
+Pillow==10.2.0
+
+# ===== Video Processing =====
+moviepy==1.0.3
+imageio==2.34.0
+imageio-ffmpeg==0.4.9
+numpy==1.26.4
+proglog==0.1.10
+tqdm==4.66.2
+
+# ===== Scene Detection =====
+scenedetect[opencv]==0.6.3
+opencv-python==4.9.0.80
+
+# ===== Downloader =====
+yt-dlp==2024.3.10
+
+# ===== Web / Flask =====
+Flask==3.0.2
+Flask-SocketIO==5.3.6
+python-socketio==5.11.1
+python-engineio==4.9.0
+Werkzeug==3.0.1
+
+# ===== Utilities =====
+eventlet==0.35.2
