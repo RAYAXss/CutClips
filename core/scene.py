@@ -46,27 +46,27 @@ def transcribe_video(log, category: str, downloads_folder: str = None):
             d = Path(downloads_folder)
             mp4s = list(d.glob("*.mp4"))
             if not mp4s:
-                log("Aucun mp4 trouvé dans le dossier de téléchargement.")
+                log("Aucun mp4 trouvé dans le dossier de téléchargement.", "error")
                 return
             video_path = str(mp4s[0])
         else:
             # fallback: cherche dans downloads/video_*/
             roots = sorted(Path("downloads").glob("video_*"), key=lambda p: int(p.name.split("_")[-1]) if "_" in p.name else 0)
             if not roots:
-                log("Aucun dossier downloads trouvé.")
+                log("Aucun dossier downloads trouvé.", "error")
                 return
             latest = roots[-1]
             mp4s = list(latest.glob("*.mp4"))
             if not mp4s:
-                log("Aucun mp4 dans le dossier downloads le plus récent.")
+                log("Aucun mp4 dans le dossier downloads le plus récent.", "error")
                 return
             video_path = str(mp4s[0])
 
         scenes = detecter_scenes(video_path, category)
-        log(f"Scenes détectées: {len(scenes)}")
+        log(f"Detected clips: {len(scenes)}")
         couper_et_monter(video_path, scenes, category)
         log("Découpage et montage des clips terminés.")
     except Exception as e:
-        log(f"Erreur transcribe_video: {e}")
+        log(f"Erreur transcribe_video: {e}", "error")
 
 

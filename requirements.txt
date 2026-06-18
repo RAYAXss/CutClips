@@ -15,7 +15,8 @@ scenedetect[opencv]==0.6.3
 opencv-python==4.9.0.80
 
 # ===== Downloader =====
-yt-dlp==2024.3.10
+yt-dlp>=2025.1.15        # TikTok support breaks on old versions, always keep recent
+certifi>=2024.6.20
 
 # ===== Web / Flask =====
 Flask==3.0.2
@@ -26,3 +27,7 @@ Werkzeug==3.0.1
 
 # ===== Utilities =====
 eventlet==0.35.2
+
+python-dotenv>=1.0.0
+
+requests>=2.31.0

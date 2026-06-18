@@ -93,7 +93,7 @@ def create_video_from_clips(log, filename: str, tiktok: bool, category: str, cib
     try:
         clips = _load_clips()
         if not clips:
-            log("Aucun clip disponible dans le JSON.")
+            log("Aucun clip disponible dans le JSON.", "error")
             return None
 
         # choose category
@@ -104,14 +104,11 @@ def create_video_from_clips(log, filename: str, tiktok: bool, category: str, cib
             chosen = category
 
             
-        if chosen=="funny":
-            use_catcore= True
-        else:
-            use_catcore=False
+        
         # filter clips by category start name
         clips_filtered = [c for c in clips if Path(c["clip_path"]).stem.startswith(chosen)]
         if not clips_filtered:
-            log(f"Aucun clip trouvé pour la catégorie {chosen}.")
+            log(f"Aucun clip trouvé pour la catégorie {chosen}.", "error")
             return None
 
         random.shuffle(clips_filtered)
@@ -142,7 +139,7 @@ def create_video_from_clips(log, filename: str, tiktok: bool, category: str, cib
                 break
 
         if not selected:
-            log("Aucun clip sélectionné après filtrage.")
+            log("Aucun clip sélectionné après filtrage.", "error")
             return None
 
         # resize/crop to vertical if needed
@@ -188,10 +185,10 @@ def create_video_from_clips(log, filename: str, tiktok: bool, category: str, cib
                 c.close()
             except:
                 pass
-        log(f"Vidéo finale enregistrée: {out_path}")
+        log(f"Vidéo finale enregistrée: {out_path}", "success")
         return str(out_path)
     except Exception as e:
-        log(f"Erreur create_video_from_clips: {e}")
+        log(f"Erreur create_video_from_clips: {e}", "error")
         return None
 
 def create_video_batch(nb: int, filename: str, tiktok: bool, category: str, log, cible: float, marge: float, use_catcore: bool, output_folder: str):
