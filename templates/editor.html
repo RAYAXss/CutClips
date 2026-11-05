@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Montage{% endblock %}
+{% block heading %}Montage · {{ name }}{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="ed">
+    <div>
+      <div class="stage" id="stage">
+        <video id="v" src="/media/{{ name | urlencode }}" controls playsinline preload="auto"></video>
+      </div>
+      <p class="hint" style="margin-top:8px">L'aperçu est approximatif (police, position). L'export crée un nouveau fichier, l'original n'est jamais modifié.</p>
+    </div>
+
+    <div>
+      <form method="POST" action="/editor/{{ name | urlencode }}/export" id="edform">
+        <input type="hidden" name="texts" id="texts-json">
+        <div class="card">
+          <div class="card-t">{{ icon('music') }} Son</div>
+          <div class="f">
+            <div class="sl-top"><label class="sl-name" for="vv">Volume de la vidéo</label><div class="sl-val"><span id="vv-o">100</span><small>%</small></div></div>
+            <input type="range" id="vv" name="video_vol" min="0" max="150" value="100" data-out="vv-o">
+          </div>
+          <div class="f">
+            <label class="l" for="music">Musique de fond</label>
+            <select class="in" id="music" name="music">
+              <option value="">Aucune</option>
+              {% for m in musics %}<option value="{{ m }}" {{ 'selected' if m == selected_music }}>{{ m }}</option>{% endfor %}
+            </select>
+          </div>
+          <div id="music-opts">
+            <div class="f">
+              <div class="sl-top"><label class="sl-name" for="mv">Volume de la musique</label><div class="sl-val"><span id="mv-o">100</span><small>%</small></div></div>
+              <input type="range" id="mv" name="music_vol" min="0" max="150" value="100" data-out="mv-o">
+            </div>
+            <div class="grid2">
+              <div class="f"><label class="l" for="mo">Début musique <span>sec</span></label><input class="in" id="mo" type="number" name="music_offset" value="0" min="0" step="0.5"></div>
+              <div class="f"><label class="l" for="fd">Fondu de fin <span>sec</span></label><input class="in" id="fd" type="number" name="fade" value="2" min="0" max="10" step="0.5"></div>
+            </div>
+            <p class="hint">La musique boucle si elle est plus courte que la vidéo et s'arrête à la fin.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-t">{{ icon('type') }} Textes</div>
+          <div id="texts"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="add-text" style="margin-top:10px">{{ icon('plus') }} Ajouter un texte</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="add-end" style="margin-top:10px">{{ icon('plus') }} Texte de fin</button>
+        </div>
+
+        <div class="card">
+          <button type="submit" class="btn btn-primary btn-lg" style="width:100%">{{ icon('check') }} Exporter</button>
+        </div>
+      </form>
+
+      <form method="POST" action="/music/upload" enctype="multipart/form-data" class="card">
+        <div class="card-t">{{ icon('upload') }} Importer une musique</div>
+        <input type="hidden" name="back" value="{{ name }}">
+        <label class="sr" for="mf">Fichier audio</label>
+        <div class="row"><input class="in grow" id="mf" type="file" name="file" accept=".mp3,.m4a,.wav,.aac,.ogg,audio/*" required>
+        <button class="btn btn-ghost" type="submit">Importer</button></div>
+        <p class="hint" style="margin-top:8px">Rangée dans assets/music/. Évite les musiques commerciales : TikTok peut couper le son.</p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<template id="text-tpl">
+  <div class="txt-item">
+    <div class="row"><label class="sr">Texte</label><textarea class="in grow t-text" rows="2" maxlength="300" placeholder="Ton texte..."></textarea>
+      <button type="button" class="btn btn-danger btn-sm t-del" aria-label="Retirer ce texte">{{ icon('x') }}</button></div>
+    <div class="mini">
+      <div><label class="l">Début</label><input class="in t-start" type="number" min="0" step="0.1" value="0"></div>
+      <div><label class="l">Fin</label><input class="in t-end" type="number" min="0" step="0.1" value="3"></div>
+      <div><label class="l">Position</label><select class="in t-pos">
+        <option value="top">Haut</option><option value="center">Centre</option><option value="bottom" selected>Bas</option></select></div>
+      <div><label class="l">Couleur</label><select class="in t-color">
+        <option value="white">Blanc</option><option value="yellow">Jaune</option><option value="black">Noir</option></select></div>
+      <div class="full" style="grid-column:1/-1"><label class="l">Taille <span class="t-size-o">72</span></label><input class="t-size" type="range" min="24" max="160" value="72"></div>
+    </div>
+  </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var v = document.getElementById('v'), stage = document.getElementById('stage');
+  var musicSel = document.getElementById('music'), mv = document.getElementById('mv'), vv = document.getElementById('vv');
+  var mo = document.getElementById('mo'), fd = document.getElementById('fd');
+  var list = document.getElementById('texts'), tpl = document.getElementById('text-tpl');
+  var audio = new Audio(); audio.loop = true; audio.preload = 'auto';
+  var ctx, vGain, mGain;
+  var COLORS = { white: '#fff', yellow: '#facc15', black: '#000' };
+
+  // Web Audio so gain can go above 100 % (media.volume is capped at 1)
+  function ensureAudio() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    vGain = ctx.createGain(); mGain = ctx.createGain();
+    ctx.createMediaElementSource(v).connect(vGain).connect(ctx.destination);
+    ctx.createMediaElementSource(audio).connect(mGain).connect(ctx.destination);
+    applyGains();
+  }
+  function fadeFactor() {
+    var f = parseFloat(fd.value) || 0, left = (v.duration || 0) - v.currentTime;
+    return f > 0 && left < f ? Math.max(0, left / f) : 1;
+  }
+  function applyGains() {
+    if (!ctx) return;
+    vGain.gain.value = vv.value / 100;
+    mGain.gain.value = musicSel.value ? (mv.value / 100) * fadeFactor() : 0;
+  }
+  function syncMusic() {
+    if (!musicSel.value || !audio.duration) return;
+    var off = parseFloat(mo.value) || 0;
+    var t = off + v.currentTime;
+    audio.currentTime = t < audio.duration ? t : (t - off) % audio.duration;
+  }
+  function setMusic() {
+    document.getElementById('music-opts').style.display = musicSel.value ? '' : 'none';
+    audio.pause();
+    if (musicSel.value) { audio.src = '/music/' + encodeURIComponent(musicSel.value); if (!v.paused) audio.play(); }
+    applyGains();
+  }
+  v.addEventListener('play', function () { ensureAudio(); ctx.resume(); syncMusic(); if (musicSel.value) audio.play(); });
+  v.addEventListener('pause', function () { audio.pause(); });
+  v.addEventListener('seeked', syncMusic);
+  v.addEventListener('timeupdate', function () { applyGains(); renderOverlays(); });
+  audio.addEventListener('loadedmetadata', syncMusic);
+  [vv, mv, fd].forEach(function (e) { e.addEventListener('input', applyGains); });
+  mo.addEventListener('change', syncMusic);
+  musicSel.addEventListener('change', setMusic);
+  setMusic();
+
+  // Text overlays
+  function addText(start, end, text, pos) {
+    var node = tpl.content.firstElementChild.cloneNode(true);
+    var ov = document.createElement('div'); ov.className = 'ov'; stage.appendChild(ov);
+    node._ov = ov;
+    node.querySelector('.t-start').value = start;
+    node.querySelector('.t-end').value = end;
+    node.querySelector('.t-text').value = text || '';
+    if (pos) node.querySelector('.t-pos').value = pos;
+    node.querySelector('.t-del').onclick = function () { ov.remove(); node.remove(); };
+    node.addEventListener('input', renderOverlays);
+    node.addEventListener('change', renderOverlays);
+    list.appendChild(node);
+    renderOverlays();
+    node.querySelector('.t-text').focus();
+  }
+  function read(node) {
+    return {
+      text: node.querySelector('.t-text').value,
+      start: parseFloat(node.querySelector('.t-start').value) || 0,
+      end: parseFloat(node.querySelector('.t-end').value) || 0,
+      position: node.querySelector('.t-pos').value,
+      color: node.querySelector('.t-color').value,
+      size: parseInt(node.querySelector('.t-size').value, 10)
+    };
+  }
+  function renderOverlays() {
+    var scale = v.videoHeight ? v.clientHeight / v.videoHeight : 0.3, t = v.currentTime;
+    list.querySelectorAll('.txt-item').forEach(function (node) {
+      var d = read(node), ov = node._ov;
+      node.querySelector('.t-size-o').textContent = d.size;
+      ov.textContent = d.text;
+      ov.style.fontSize = (d.size * scale) + 'px';
+      ov.style.color = COLORS[d.color];
+      ov.style.top = ov.style.bottom = ov.style.transform = '';
+      if (d.position === 'top') ov.style.top = '12%';
+      else if (d.position === 'center') { ov.style.top = '50%'; ov.style.transform = 'translateY(-50%)'; }
+      else ov.style.bottom = '22%';
+      ov.style.display = d.text && t >= d.start && t <= d.end ? 'block' : 'none';
+    });
+  }
+  v.addEventListener('loadedmetadata', renderOverlays);
+  window.addEventListener('resize', renderOverlays);
+  document.getElementById('add-text').onclick = function () {
+    var s = Math.round(v.currentTime * 10) / 10; addText(s, Math.round((s + 3) * 10) / 10);
+  };
+  document.getElementById('add-end').onclick = function () {
+    var d = v.duration || 3; addText(Math.max(0, Math.round((d - 3) * 10) / 10), Math.ceil(d * 10) / 10, 'Abonne-toi pour la suite !', 'center');
+  };
+
+  document.getElementById('edform').addEventListener('submit', function () {
+    var texts = [];
+    list.querySelectorAll('.txt-item').forEach(function (n) { var d = read(n); if (d.text.trim()) texts.push(d); });
+    document.getElementById('texts-json').value = JSON.stringify(texts);
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block heading %}Comptes{% endblock %}
+{% block content %}
+<div class="wrap narrow">
+  <div class="sh"><h2 class="sh-t">TikTok</h2><div class="sh-l"></div></div>
+  {% if not tiktok_configured %}
+  <div class="card">
+    <div class="card-t">Configuration (une seule fois)</div>
+    <ol class="steps">
+      <li>Crée une app sur <a href="https://developers.tiktok.com" target="_blank" rel="noopener">developers.tiktok.com</a>, plateforme <strong>Desktop</strong>.</li>
+      <li>Ajoute les produits <strong>Login Kit</strong> et <strong>Content Posting API</strong>, scopes <code>user.info.basic</code>, <code>video.upload</code>, <code>video.publish</code>.</li>
+      <li>Déclare l'URL de redirection exacte : <code>{{ redirect_uri }}</code></li>
+      <li>Crée un fichier <code>.env</code> à la racine du projet avec :<br><code>TIKTOK_CLIENT_KEY=...</code><br><code>TIKTOK_CLIENT_SECRET=...</code></li>
+      <li>Relance ClipTwist, puis reviens ici.</li>
+    </ol>
+  </div>
+  {% elif tiktok_linked %}
+  <div class="card">
+    <div class="acct">
+      {% if tiktok_user.avatar_url %}<img class="avatar" src="{{ tiktok_user.avatar_url }}" alt="">{% endif %}
+      <div class="grow">
+        <div class="tg-t">{{ tiktok_user.display_name or 'Compte TikTok' }}</div>
+        <div class="hint"><span class="badge ok">connecté</span></div>
+      </div>
+      <form method="POST" action="/tiktok/disconnect" data-confirm="Déconnecter le compte TikTok ?">
+        <button class="btn btn-danger" type="submit">{{ icon('x') }} Déconnecter</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="card">
+    <p class="f">Connecte ton compte pour envoyer tes vidéos depuis la Bibliothèque.</p>
+    <form method="POST" action="/tiktok/connect"><button class="btn btn-primary" type="submit">{{ icon('link') }} Connecter TikTok</button></form>
+  </div>
+  {% endif %}
+  <div class="card">
+    <div class="card-t">À savoir</div>
+    <ul class="steps">
+      <li>Tant que TikTok n'a pas audité ton app, les vidéos publiées directement sont <strong>privées</strong> (« Moi uniquement »). Tu les passes en public depuis l'app TikTok.</li>
+      <li>Le mode <strong>brouillon</strong> envoie la vidéo dans ta boîte TikTok : tu finis la publication dans l'app (musique, texte, visibilité).</li>
+      <li>Une musique commerciale ajoutée dans l'éditeur peut être coupée par TikTok. Préfère des musiques libres de droits.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

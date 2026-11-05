@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block heading %}Utilisateurs{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="grid2">
+    <div>
+      <form method="POST" action="/admin/create_user" class="card">
+        <div class="card-t">Créer un utilisateur</div>
+        <div class="f"><label class="l" for="nu">Utilisateur</label><input class="in" id="nu" name="username" required autocomplete="off"></div>
+        <div class="f"><label class="l" for="np">Mot de passe</label><input class="in" id="np" type="password" name="password" required autocomplete="new-password"></div>
+        <button type="submit" class="btn btn-green">{{ icon('plus') }} Créer</button>
+      </form>
+      <div class="card">
+        <div class="card-t">Utilisateurs ({{ users_list | length }})</div>
+        <div class="ulist">
+          {% for u in users_list %}
+          <div class="urow">
+            <span class="uname">{{ u }}</span>
+            {% if u == 'admin' %}<span class="badge purple">admin</span>{% endif %}
+            <button class="btn btn-warn btn-sm" type="button" data-open="moPwd" data-user="{{ u }}">Mot de passe</button>
+            {% if u != 'admin' %}
+            <form method="POST" action="/admin/delete_user" data-confirm="Supprimer l'utilisateur {{ u }} ?">
+              <input type="hidden" name="username" value="{{ u }}">
+              <button type="submit" class="btn btn-danger btn-sm" aria-label="Supprimer {{ u }}">{{ icon('trash') }}</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-t">Historique de connexion (50 derniers)</div>
+      <div class="scroll">
+        {% if login_history %}
+        <table class="tbl">
+          <thead><tr><th>Date</th><th>Utilisateur</th><th>Statut</th></tr></thead>
+          <tbody>
+          {% for e in login_history %}
+          <tr><td>{{ e.ts }}</td><td>{{ e.username }}</td><td><span class="badge {{ 'ok' if e.success else 'fail' }}">{{ 'OK' if e.success else 'Échec' }}</span></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<div class="empty">Aucun historique.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block dialogs %}
+<dialog id="moPwd">
+  <div class="mo-t warn">Changer le mot de passe</div>
+  <form method="POST" action="/admin/change_password">
+    <input type="hidden" name="username" data-fill>
+    <div class="f"><label class="l" for="npw">Nouveau mot de passe pour&nbsp;<span data-fill></span></label>
+      <input class="in" id="npw" type="password" name="new_password" required autocomplete="new-password"></div>
+    <div class="mo-a">
+      <button type="button" class="btn btn-ghost" data-close>Annuler</button>
+      <button type="submit" class="btn btn-primary">Mettre à jour</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

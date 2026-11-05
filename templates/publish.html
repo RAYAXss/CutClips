@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set PRIVACY = {'PUBLIC_TO_EVERYONE': 'Tout le monde', 'MUTUAL_FOLLOW_FRIENDS': 'Amis (abonnements mutuels)', 'FOLLOWER_OF_CREATOR': 'Abonnés', 'SELF_ONLY': 'Moi uniquement'} %}
+{% block title %}Publier{% endblock %}
+{% block heading %}Publier sur TikTok{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="ed">
+    <div class="stage"><video src="/media/{{ name | urlencode }}" controls playsinline preload="metadata"></video></div>
+
+    <form method="POST" id="pubform">
+      <div class="card">
+        <div class="card-t">Compte</div>
+        {% if creator.creator_nickname %}
+        <div class="acct">
+          {% if creator.creator_avatar_url %}<img class="avatar" src="{{ creator.creator_avatar_url }}" alt="">{% endif %}
+          <div><div class="tg-t">{{ creator.creator_nickname }}</div><div class="hint">@{{ creator.creator_username }}</div></div>
+        </div>
+        {% elif creator_error %}
+        <div class="note warn">TikTok ne permet pas la publication directe pour l'instant : {{ creator_error }}. <a href="">Réessayer</a>. Le mode brouillon reste possible.</div>
+        {% endif %}
+        {% if too_long %}<div class="note warn" style="margin-top:10px">Vidéo trop longue pour ce compte ({{ duration | round(0) | int }} s, max {{ creator.max_video_post_duration_sec }} s).</div>{% endif %}
+      </div>
+
+      <div class="card">
+        <div class="card-t">Mode</div>
+        <label class="radio"><input type="radio" name="mode" value="inbox" checked>
+          <span><span class="tg-t">Brouillon dans l'app TikTok</span><br><span class="tg-d">Tu reçois une notification dans TikTok et tu termines la publication là-bas.</span></span></label>
+        <label class="radio"><input type="radio" name="mode" value="direct" {{ 'disabled' if creator_error or too_long }}>
+          <span><span class="tg-t">Publier directement</span><br><span class="tg-d">Privé uniquement tant que l'app TikTok n'est pas auditée.</span></span></label>
+      </div>
+
+      <div id="direct" hidden>
+        <div class="card">
+          <div class="card-t">Publication</div>
+          <div class="f"><label class="l" for="title">Légende <span>#hashtags compris</span></label><textarea class="in" id="title" name="title" maxlength="2200" rows="3"></textarea></div>
+          <div class="f">
+            <label class="l" for="privacy">Qui peut voir cette vidéo</label>
+            <select class="in" id="privacy" name="privacy">
+              <option value="" selected disabled>Choisir…</option>
+              {% for p in creator.privacy_level_options or [] %}<option value="{{ p }}">{{ PRIVACY.get(p, p) }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="l">Autoriser</div>
+          <label class="tg"><input type="checkbox" name="allow_comment" {{ 'disabled' if creator.comment_disabled }}><span class="tsw"></span><span class="tg-t">Commentaires</span></label>
+          <label class="tg"><input type="checkbox" name="allow_duet" {{ 'disabled' if creator.duet_disabled }}><span class="tsw"></span><span class="tg-t">Duo</span></label>
+          <label class="tg"><input type="checkbox" name="allow_stitch" {{ 'disabled' if creator.stitch_disabled }}><span class="tsw"></span><span class="tg-t">Collage</span></label>
+        </div>
+        <div class="card">
+          <div class="card-t">Contenu commercial</div>
+          <label class="tg"><input type="checkbox" name="disclose" id="disclose"><span class="tsw"></span><span><span class="tg-t">Divulguer un contenu commercial</span><br><span class="tg-d">Cette vidéo fait la promotion d'une marque, d'un produit ou d'un service.</span></span></label>
+          <div id="brand" hidden style="margin-top:8px">
+            <label class="tg"><input type="checkbox" name="brand_organic" id="b-own"><span class="tsw"></span><span><span class="tg-t">Ta marque</span><br><span class="tg-d">Tu fais la promotion de toi-même ou de ton activité.</span></span></label>
+            <label class="tg"><input type="checkbox" name="brand_content" id="b-paid"><span class="tsw"></span><span><span class="tg-t">Contenu sponsorisé</span><br><span class="tg-d">Partenariat rémunéré avec une marque. Ne peut pas être privé.</span></span></label>
+          </div>
+        </div>
+        <div class="card">
+          <label class="tg"><input type="checkbox" name="consent" id="consent"><span class="tsw"></span>
+            <span class="tg-d">En publiant, tu acceptes la <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Music Usage Confirmation</a> de TikTok<span id="bc-terms" hidden> et la <a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Branded Content Policy</a></span>.</span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="hint f">Le traitement par TikTok peut prendre quelques minutes. Suis l'avancement dans la file de travail.</p>
+        <button type="submit" class="btn btn-primary btn-lg" id="send" style="width:100%">{{ icon('upload') }} Envoyer</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var f = document.getElementById('pubform'), direct = document.getElementById('direct');
+  var disclose = document.getElementById('disclose'), own = document.getElementById('b-own'), paid = document.getElementById('b-paid');
+  var privacy = document.getElementById('privacy'), consent = document.getElementById('consent'), send = document.getElementById('send');
+  function update() {
+    var isDirect = f.mode.value === 'direct';
+    direct.hidden = !isDirect;
+    document.getElementById('brand').hidden = !disclose.checked;
+    document.getElementById('bc-terms').hidden = !(disclose.checked && paid.checked);
+    var priv = privacy.querySelector('option[value=SELF_ONLY]');
+    if (priv) { priv.disabled = disclose.checked && paid.checked; if (priv.disabled && privacy.value === 'SELF_ONLY') privacy.value = ''; }
+    send.disabled = isDirect && (!privacy.value || !consent.checked || (disclose.checked && !own.checked && !paid.checked));
+    send.lastChild.textContent = isDirect ? ' Publier' : ' Envoyer en brouillon';
+  }
+  f.addEventListener('change', update);
+  update();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block heading %}Dossiers{% endblock %}
+{% block content %}
+<div class="wrap narrow">
+  <div class="sh"><h2 class="sh-t">Chemins</h2><div class="sh-l"></div></div>
+  <form method="POST" action="/settings/folders" class="card">
+    <div class="f">
+      <label class="l" for="of">Dossier de sortie <span>vidéos générées et montées</span></label>
+      <div class="row">
+        <input class="in mono grow" id="of" name="output_folder" value="{{ output_folder }}" spellcheck="false" required>
+        <button class="btn btn-ghost" type="submit" formaction="/settings/browse/output_folder" formnovalidate>{{ icon('folder') }} Parcourir</button>
+      </div>
+    </div>
+    <div class="f">
+      <label class="l" for="if">Dossier d'entrée <span>clips scannés par « Restaurer le JSON »</span></label>
+      <div class="row">
+        <input class="in mono grow" id="if" name="input_folder" value="{{ input_folder }}" spellcheck="false" required>
+        <button class="btn btn-ghost" type="submit" formaction="/settings/browse/input_folder" formnovalidate>{{ icon('folder') }} Parcourir</button>
+      </div>
+    </div>
+    <p class="hint f">Colle un chemin absolu ou utilise « Parcourir » (la fenêtre s'ouvre sur ce PC, parfois derrière le navigateur). Le dossier est créé s'il n'existe pas. Les choix sont gardés après redémarrage.</p>
+    <button class="btn btn-primary" type="submit">{{ icon('check') }} Enregistrer</button>
+  </form>
+</div>
+{% endblock %}

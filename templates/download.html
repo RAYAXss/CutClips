@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block heading %}Téléchargement{% endblock %}
+{% block content %}
+<div class="wrap narrow">
+  <div class="sh"><h2 class="sh-t">Télécharger une vidéo</h2><div class="sh-l"></div></div>
+  <form method="POST" action="/download" class="card">
+    <div class="f"><label class="l" for="url">URL de la vidéo</label><input class="in" id="url" type="url" name="url" placeholder="https://youtube.com/watch?v=..." required></div>
+    <div class="f"><label class="l" for="cat">Catégorie <span>optionnel</span></label><input class="in" id="cat" type="text" name="category" placeholder="funny"></div>
+    <p class="hint f">La vidéo est découpée en scènes puis rangée dans le dossier clips/.</p>
+    <button type="submit" class="btn btn-green">{{ icon('download') }} Télécharger</button>
+  </form>
+</div>
+{% endblock %}

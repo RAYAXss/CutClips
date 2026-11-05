@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block heading %}Bibliothèque{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="sh"><h2 class="sh-t">Vidéos générées ({{ videos | length }})</h2><div class="sh-l"></div>
+    <a class="btn btn-ghost btn-sm" href="/section/settings">{{ icon('folder') }} Changer de dossier</a></div>
+  {% if videos %}
+  <div class="lib">
+    {% for v in videos %}
+    <article class="vcard">
+      <video src="/media/{{ v.name | urlencode }}" preload="metadata" controls muted playsinline></video>
+      <div class="vmeta"><div class="vname" title="{{ v.name }}">{{ v.name }}</div><div class="vsub">{{ v.date }} · {{ v.size }}</div></div>
+      <div class="vact">
+        <a class="btn btn-ghost btn-sm" href="/editor/{{ v.name | urlencode }}">{{ icon('scissors') }} Éditer</a>
+        <a class="btn btn-ghost btn-sm" href="/publish/{{ v.name | urlencode }}">{{ icon('upload') }} TikTok</a>
+        <form method="POST" action="/library/delete" data-confirm="Supprimer {{ v.name }} ? Le fichier sera effacé du disque.">
+          <input type="hidden" name="name" value="{{ v.name }}">
+          <button class="btn btn-danger btn-sm" type="submit" aria-label="Supprimer {{ v.name }}">{{ icon('trash') }}</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card empty">Aucune vidéo dans <code>{{ output_folder }}</code>.<br><br><a class="btn btn-primary" href="/section/creation">{{ icon('play') }} Générer des vidéos</a></div>
+  {% endif %}
+</div>
+{% endblock %}
