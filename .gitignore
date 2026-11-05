@@ -17,3 +17,6 @@ assets/*
 # Virtual env
 venv/
 .env
+
+# Secrets
+cookies.txt
