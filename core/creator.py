@@ -2,8 +2,11 @@
 import os
 import json
 import random
+import uuid
+import datetime
 from pathlib import Path
 from moviepy.editor import VideoFileClip, concatenate_videoclips
+from proglog import ProgressBarLogger
 from .categories import choose_weighted_category
 
 CLIPS_FOLDER = Path("clips")
@@ -84,12 +87,55 @@ def _load_clips(json_file: str = str(DATA_CLIPS_JSON)):
     except Exception:
         return []
 
-def create_video_from_clips(log, filename: str, tiktok: bool, category: str, cible: float, marge: float, use_catcore: bool, output_folder: str):
+
+def select_clips(clips: list, cible: float, marge: float) -> list:
+    """Pick clips (already shuffled) until total duration lands in [cible-marge, cible+marge].
+    Uses the duration stored in clips_info.json, so no file is opened here."""
+    selected, used, total = [], set(), 0.0
+    target_min = max(cible - marge, 0)
+    target_max = cible + marge
+    for c in clips:
+        p, d = c.get("clip_path"), float(c.get("duration") or 0)
+        if p in used or d < 0.5 or total + d > target_max:
+            continue
+        selected.append(c)
+        used.add(p)
+        total += d
+        if total >= target_min:
+            break
+    return selected
+
+
+def _fit(clip, target_w: int, target_h: int):
+    """Resize to target height, then crop or pad to target width."""
+    clip = clip.resize(height=target_h)
+    if clip.w < target_w:
+        return clip.on_color(size=(target_w, target_h), color=(0, 0, 0), pos=("center", "center"))
+    return clip.crop(x_center=clip.w / 2, width=target_w)
+
+
+class _ProgressLogger(ProgressBarLogger):
+    """Forward moviepy's frame progress ('t' bar) to a 0-100 callback."""
+    def __init__(self, cb):
+        super().__init__()
+        self.cb = cb
+
+    def bars_callback(self, bar, attr, value, old_value=None):
+        if bar == "t" and attr == "index":
+            total = self.bars[bar].get("total") or 0
+            if total:
+                self.cb(value / total * 100)
+
+
+def create_video_from_clips(log, filename: str, tiktok: bool, category: str, cible: float, marge: float,
+                            use_catcore: bool, output_folder: str, progress=None):
     """
     Compose une vidéo finale à partir des clips disponibles.
     - Choix de catégorie: si category vide ou placeholder -> choix pondéré.
     - output_folder: dossier de sortie.
+    - progress: callback optionnel (0-100).
     """
+    opened = []
     try:
         clips = _load_clips()
         if not clips:
@@ -99,12 +145,13 @@ def create_video_from_clips(log, filename: str, tiktok: bool, category: str, cib
         # choose category
         if not category or category == "Choose or create category":
             chosen = choose_weighted_category()
+            if not chosen:
+                log("Aucune catégorie disponible.", "error")
+                return None
             log(f"Catégorie choisie (pondérée) : {chosen}")
         else:
             chosen = category
 
-            
-        
         # filter clips by category start name
         clips_filtered = [c for c in clips if Path(c["clip_path"]).stem.startswith(chosen)]
         if not clips_filtered:
@@ -112,59 +159,33 @@ def create_video_from_clips(log, filename: str, tiktok: bool, category: str, cib
             return None
 
         random.shuffle(clips_filtered)
-        selected = []
-        used = set()
-        total = 0.0
-        target_min = max(cible - marge, 0)
-        target_max = cible + marge
-
-        for c in clips_filtered:
-            p = c["clip_path"]
-            if p in used:
-                continue
-            try:
-                clip = VideoFileClip(p)
-            except Exception:
-                continue
-            if clip.duration < 0.5:
-                clip.close()
-                continue
-            if total + clip.duration > target_max:
-                clip.close()
-                continue
-            selected.append(clip)
-            used.add(p)
-            total += clip.duration
-            if total >= target_min:
-                break
-
-        if not selected:
+        chosen_clips = select_clips(clips_filtered, cible, marge)
+        if not chosen_clips:
             log("Aucun clip sélectionné après filtrage.", "error")
             return None
 
-        # resize/crop to vertical if needed
         target_w, target_h = (1080, 1920) if tiktok else (1920, 1080)
         processed = []
-        for clip in selected:
-            # ensure proper orientation/size
+        for c in chosen_clips:
             try:
-                clip_resized = clip.resize(height=target_h)
-                if clip_resized.w < target_w:
-                    # pad with black
-                    clip_resized = clip_resized.on_color(size=(target_w, target_h), color=(0,0,0), pos=("center","center"))
-                else:
-                    clip_resized = clip_resized.crop(x_center=clip_resized.w/2, width=target_w)
-                processed.append(clip_resized)
+                clip = VideoFileClip(c["clip_path"])
+                opened.append(clip)
+                processed.append(_fit(clip, target_w, target_h))
             except Exception as e:
-                clip.close()
+                log(f"Clip ignoré {c['clip_path']}: {e}", "warn")
+        if not processed:
+            log("Aucun clip lisible.", "error")
+            return None
 
-        # separator option
+        # separator option (same size as the other clips, otherwise compose misaligns it)
         separator_clip = None
         if use_catcore and SEPARATOR_NAME.exists():
             try:
-                separator_clip = VideoFileClip(str(SEPARATOR_NAME))
-            except Exception:
-                separator_clip = None
+                raw = VideoFileClip(str(SEPARATOR_NAME))
+                opened.append(raw)
+                separator_clip = _fit(raw, target_w, target_h)
+            except Exception as e:
+                log(f"Séparateur ignoré: {e}", "warn")
 
         final_sequence = []
         for i, c in enumerate(processed):
@@ -173,23 +194,25 @@ def create_video_from_clips(log, filename: str, tiktok: bool, category: str, cib
                 final_sequence.append(separator_clip)
 
         final = concatenate_videoclips(final_sequence, method="compose")
+        opened.append(final)
         out_folder = Path(output_folder)
         out_folder.mkdir(parents=True, exist_ok=True)
-        index = len(list(out_folder.glob("*.mp4"))) + 1
-        out_path = out_folder / f"{chosen}_{filename}_{index}.mp4"
-        final.write_videofile(str(out_path), codec="libx264", audio_codec="aac")
-        final.close()
-        # close clips
-        for c in processed:
-            try:
-                c.close()
-            except:
-                pass
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = out_folder / f"{chosen}_{filename}_{stamp}_{uuid.uuid4().hex[:4]}.mp4"
+        final.write_videofile(str(out_path), codec="libx264", audio_codec="aac",
+                              logger=_ProgressLogger(progress) if progress else None)
         log(f"Vidéo finale enregistrée: {out_path}", "success")
         return str(out_path)
     except Exception as e:
         log(f"Erreur create_video_from_clips: {e}", "error")
         return None
+    finally:
+        for c in opened:
+            try:
+                c.close()
+            except Exception:
+                pass
+
 
 def create_video_batch(nb: int, filename: str, tiktok: bool, category: str, log, cible: float, marge: float, use_catcore: bool, output_folder: str):
     for i in range(nb):

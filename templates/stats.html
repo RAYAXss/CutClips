@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block heading %}Poids des catégories{% endblock %}
+{% block content %}
+<div class="wrap narrow">
+  <div class="sh"><h2 class="sh-t">Poids (choix pondéré)</h2><div class="sh-l"></div></div>
+  {% for cat, val in weights.items() %}
+  <form method="POST" action="/update_weight" class="wr">
+    <input type="hidden" name="category" value="{{ cat }}">
+    <label class="wcat" for="w-{{ loop.index }}">{{ cat }}</label>
+    <input class="in mono wnum" id="w-{{ loop.index }}" type="number" step="0.01" min="0" name="value" value="{{ '%.2f' | format(val) }}" required>
+    <button type="submit" class="btn btn-warn btn-sm">Enregistrer</button>
+  </form>
+  {% else %}
+  <div class="card empty">Aucune catégorie : télécharge d'abord des clips.</div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% from "_icons.html" import icon %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClipTwist — {% block title %}{{ active | capitalize }}{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+{% set nav = [
+  ('Workflow', [('creation', 'Création', 'play'), ('download', 'Téléchargement', 'download'), ('library', 'Bibliothèque', 'film')]),
+  ('Réglages', [('accounts', 'Comptes', 'link'), ('settings', 'Dossiers', 'folder'), ('stats', 'Poids', 'sliders')]),
+] %}
+<nav class="sb" aria-label="Navigation principale">
+  <div class="sb-logo"><span class="lbl">ClipTwist</span></div>
+  {% for grp, items in nav %}
+  <div class="sb-grp">{{ grp }}</div>
+  {% for key, label, ic in items %}
+  <a class="nl {{ 'active' if active == key }}" href="/section/{{ key }}" {% if active == key %}aria-current="page"{% endif %}>{{ icon(ic) }}<span class="lbl">{{ label }}</span></a>
+  {% endfor %}
+  {% endfor %}
+  {% if admin %}
+  <div class="sb-grp">Admin</div>
+  <a class="nl {{ 'active' if active == 'admin' }}" href="/section/admin">{{ icon('shield') }}<span class="lbl">Utilisateurs</span></a>
+  {% endif %}
+  <div class="sb-sp"></div>
+  <div class="sb-foot">
+    <a class="fpill" href="/section/settings" title="{{ output_folder }}"><span>Sortie</span><b>{{ output_folder }}</b></a>
+    <form method="POST" action="/logout"><button class="nl red" type="submit">{{ icon('logout') }}<span class="lbl">Déconnexion ({{ username }})</span></button></form>
+  </div>
+</nav>
+
+<div class="ab">
+  <header class="topbar">
+    <h1 class="tb-t">{% block heading %}{{ active }}{% endblock %}</h1>
+    <button class="btn btn-warn btn-sm" type="button" data-open="moAuto">{{ icon('zap') }} Auto Weekly</button>
+    <form method="POST" action="/clear_logs"><button class="btn btn-ghost btn-sm" type="submit">{{ icon('eraser') }} Vider les logs</button></form>
+  </header>
+
+  <main class="content">{% block content %}{% endblock %}</main>
+
+  <section class="panel" aria-label="Activité">
+    <div class="pcol">
+      <div class="ph"><span class="pt">File de travail</span></div>
+      <div class="pb" id="jobbox" aria-live="polite">
+        {% if not jobs_list %}<div class="hint" id="jobempty">Aucune tâche.</div>{% endif %}
+      </div>
+    </div>
+    <div class="pcol">
+      <div class="ph"><span class="pt">Logs</span><span class="pc" id="lc">{{ logs | length }}</span></div>
+      <div class="pb" id="logbox">
+        {% for l in logs %}<div class="logline {{ l.level }}">{{ l.text }}</div>{% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+{% for level, msg in get_flashed_messages(with_categories=true) %}<span hidden data-flash="{{ msg }}" data-level="{{ level }}"></span>{% endfor %}
+
+<dialog id="moAuto">
+  <div class="mo-t warn">Auto Weekly</div>
+  <div class="mo-b">Supprime <strong>toutes les vidéos MP4</strong> du dossier de sortie puis génère <strong>6 nouvelles vidéos</strong> en catégorie funny.<br><br>Continuer ?</div>
+  <form method="POST" action="/auto_confirm" class="mo-a">
+    <button class="btn btn-ghost" type="button" data-close>Annuler</button>
+    <button class="btn btn-warn" type="submit">Oui, lancer</button>
+  </form>
+</dialog>
+{% block dialogs %}{% endblock %}
+
+<script>window.INITIAL_JOBS = {{ jobs_list | tojson }};</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

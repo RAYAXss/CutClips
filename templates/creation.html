@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block heading %}Création{% endblock %}
+{% block content %}
+<div class="wrap narrow">
+  <div class="sh"><h2 class="sh-t">Générer des vidéos</h2><div class="sh-l"></div></div>
+  <form method="POST" action="/create">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-t">Quantité</div>
+        <div class="sl-top"><label class="sl-name" for="nb">Vidéos à générer</label><div class="sl-val"><span id="nb-d">6</span><small>vidéos</small></div></div>
+        <input type="range" id="nb" name="number" min="1" max="20" value="6" data-out="nb-d">
+      </div>
+      <div class="card">
+        <div class="card-t">Durée</div>
+        <div class="row">
+          <div class="grow"><label class="l" for="cible">Cible <span>sec</span></label><input class="in big" id="cible" type="number" name="cible" value="70" min="1" max="600" required></div>
+          <div class="hint" style="padding-top:22px">±</div>
+          <div class="grow"><label class="l" for="marge">Marge <span>sec</span></label><input class="in big" id="marge" type="number" name="marge" value="5" min="0" max="120" required></div>
+        </div>
+      </div>
+      <div class="card full">
+        <div class="card-t">Catégorie</div>
+        <div class="chips" role="group" aria-label="Catégories rapides">
+          {% for c in ['funny','gaming','satisfying','fails','animals','cooking'] %}
+          <button type="button" class="chip" data-cat="{{ c }}" aria-pressed="{{ 'true' if c == 'funny' else 'false' }}">{{ c }}</button>
+          {% endfor %}
+        </div>
+        <label class="sr" for="cat-v">Catégorie personnalisée</label>
+        <input class="in" type="text" name="category" id="cat-v" value="funny" placeholder="Ou tape une catégorie (vide = choix pondéré)">
+      </div>
+      <div class="card full">
+        <div class="card-t">Options</div>
+        <label class="tg">
+          <input type="checkbox" name="catcore" checked>
+          <span class="tsw"></span>
+          <span><span class="tg-t">Mode Catcore</span><br><span class="tg-d">Insère assets/catcore_video.mp4 entre les clips</span></span>
+        </label>
+      </div>
+      <div class="full row">
+        <button type="submit" class="btn btn-primary btn-lg grow">{{ icon('play') }} Générer</button>
+        <button type="button" class="btn btn-ghost btn-lg" data-open="moRestore">{{ icon('refresh') }} Restaurer le JSON</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block dialogs %}
+<dialog id="moRestore">
+  <div class="mo-t danger">Restaurer le JSON</div>
+  <div class="mo-b">Rescanne le dossier d'entrée <strong>{{ input_folder }}</strong> et ajoute les clips absents de <strong>clips_info.json</strong>. Continuer ?</div>
+  <form method="POST" action="/restore" class="mo-a">
+    <button class="btn btn-ghost" type="button" data-close>Annuler</button>
+    <button class="btn btn-warn" type="submit">Oui, restaurer</button>
+  </form>
+</dialog>
+{% endblock %}

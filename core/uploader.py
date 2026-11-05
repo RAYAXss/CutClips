@@ -37,110 +37,12 @@ def render_template(template: str, platform: str, video_path: str) -> str:
 
 def upload_tiktok(video_path: str, title: str, log) -> bool:
     """
-    Upload a video to TikTok using the Content Posting API.
-
-    Required env vars:
-        TIKTOK_CLIENT_KEY
-        TIKTOK_CLIENT_SECRET
-        TIKTOK_ACCESS_TOKEN   ← obtained via OAuth flow (see /schedule/setup)
-
-    Docs: https://developers.tiktok.com/doc/content-posting-api-get-started
+    Send a video to TikTok as a draft (inbox) with the account linked in
+    Comptes (core/tiktok.py). Unattended jobs never publish directly: TikTok
+    requires the user to choose privacy and confirm in the UI for that.
     """
-    import requests
-
-    access_token = os.getenv("TIKTOK_ACCESS_TOKEN", "")
-    if not access_token:
-        log("TikTok: TIKTOK_ACCESS_TOKEN not set in .env", "error")
-        return False
-
-    try:
-        file_size = os.path.getsize(video_path)
-
-        # Step 1 — Init upload
-        log("TikTok: Initialising upload...", "info")
-        init_resp = requests.post(
-            "https://open.tiktokapis.com/v2/post/publish/video/init/",
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "post_info": {
-                    "title": title[:2200],
-                    "privacy_level": "PUBLIC_TO_EVERYONE",
-                    "disable_duet": False,
-                    "disable_comment": False,
-                    "disable_stitch": False,
-                    "video_cover_timestamp_ms": 1000
-                },
-                "source_info": {
-                    "source": "FILE_UPLOAD",
-                    "video_size": file_size,
-                    "chunk_size": file_size,
-                    "total_chunk_count": 1
-                }
-            },
-            timeout=15
-        )
-
-        if init_resp.status_code != 200:
-            log(f"TikTok: Init failed [{init_resp.status_code}] {init_resp.text[:200]}", "error")
-            return False
-
-        data = init_resp.json().get("data", {})
-        upload_url = data.get("upload_url", "")
-        publish_id = data.get("publish_id", "")
-
-        if not upload_url:
-            log("TikTok: No upload_url returned", "error")
-            return False
-
-        # Step 2 — Upload file
-        log("TikTok: Uploading video file...", "info")
-        with open(video_path, "rb") as f:
-            video_data = f.read()
-
-        upload_resp = requests.put(
-            upload_url,
-            headers={
-                "Content-Range": f"bytes 0-{file_size - 1}/{file_size}",
-                "Content-Type": "video/mp4"
-            },
-            data=video_data,
-            timeout=120
-        )
-
-        if upload_resp.status_code not in (200, 201, 206):
-            log(f"TikTok: Upload failed [{upload_resp.status_code}]", "error")
-            return False
-
-        # Step 3 — Poll status
-        log("TikTok: Waiting for processing...", "info")
-        for _ in range(12):
-            time.sleep(5)
-            status_resp = requests.post(
-                "https://open.tiktokapis.com/v2/post/publish/status/fetch/",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type": "application/json"
-                },
-                json={"publish_id": publish_id},
-                timeout=10
-            )
-            status = status_resp.json().get("data", {}).get("status", "")
-            if status == "PUBLISH_COMPLETE":
-                log(f"TikTok: Published successfully!", "success")
-                return True
-            if status in ("FAILED", "PUBLISH_FAILED"):
-                log(f"TikTok: Publish failed — status: {status}", "error")
-                return False
-
-        log("TikTok: Timeout waiting for publish status", "warn")
-        return False
-
-    except Exception as e:
-        log(f"TikTok upload error: {e}", "error")
-        return False
+    from core import tiktok
+    return tiktok.upload(video_path, log, mode="inbox") is not None
 
 
 # ══════════════════════════════════════════════════════
